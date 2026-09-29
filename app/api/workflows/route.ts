@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { startWorkflow, runResearch } from '@/lib/pipeline';
 import { listWorkflows } from '@/lib/store';
+import { sessionFromRequest } from '@/lib/auth';
+import { setLastProject } from '@/lib/userStore';
 
 export async function POST(req: Request) {
   try {
@@ -14,24 +16,29 @@ export async function POST(req: Request) {
     if (!body.opportunity?.url && !body.opportunity?.description) {
       return NextResponse.json({ error: 'Provide an opportunity URL or description.' }, { status: 400 });
     }
-    const w = await startWorkflow({
-      project: {
-        name: body.project.name || '',
-        description: body.project.description || '',
-        repoUrl: body.project.repoUrl,
-        audience: body.project.audience,
-        stage: body.project.stage,
-        problem: body.project.problem,
+    const session = sessionFromRequest(req);
+    const w = await startWorkflow(
+      {
+        project: {
+          name: body.project.name || '',
+          description: body.project.description || '',
+          repoUrl: body.project.repoUrl,
+          audience: body.project.audience,
+          stage: body.project.stage,
+          problem: body.project.problem,
+        },
+        opportunity: {
+          kind: body.opportunity.kind,
+          title: body.opportunity.title,
+          url: body.opportunity.url,
+          description: body.opportunity.description,
+          organization: body.opportunity.organization,
+          goal: body.opportunity.goal,
+        },
       },
-      opportunity: {
-        kind: body.opportunity.kind,
-        title: body.opportunity.title,
-        url: body.opportunity.url,
-        description: body.opportunity.description,
-        organization: body.opportunity.organization,
-        goal: body.opportunity.goal,
-      },
-    });
+      session?.id
+    );
+    if (session) void setLastProject(session.id, w.id);
     // Fire-and-forget: research runs in-process while the UI polls state.
     void runResearch(w.id).catch(() => undefined);
     return NextResponse.json({ id: w.id, state: w.state }, { status: 201 });
@@ -43,7 +50,8 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
-  const workflows = await listWorkflows();
+export async function GET(req: Request) {
+  const session = sessionFromRequest(req);
+  const workflows = session ? await listWorkflows(session.id) : [];
   return NextResponse.json({ workflows });
 }

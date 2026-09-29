@@ -89,10 +89,20 @@ export function integrityHash(parts: Array<string | number | undefined>): string
   return h.digest('hex');
 }
 
+/**
+ * Token resolution order: per-request override (the signed-in user's vault key),
+ * then GITHUB_TOKEN env. Lets each user execute with their own account.
+ */
+let overrideToken: string | null = null;
+
+export function setGitHubToken(token: string | null): void {
+  overrideToken = token;
+}
+
 function authHeaders(): Record<string, string> {
-  const token = process.env.GITHUB_TOKEN || '';
+  const token = overrideToken || process.env.GITHUB_TOKEN || '';
   return {
-    Authorization: `Bearer ${token}`,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
     'User-Agent': 'ContextaAgent/1.0',

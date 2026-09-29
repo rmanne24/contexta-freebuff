@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ArrowRight, ArrowUpRight } from 'lucide-react';
 import { Wordmark, Eyebrow, ExternalLinkIcon } from '@/components/ui';
+import { AccountMenu } from '@/components/AuthHeaderBits';
 
 const STEPS = ['Research', 'Evidence', 'Reasoning', 'Action', 'Verification'] as const;
 
@@ -35,14 +36,7 @@ export default function LandingPage() {
             <a href="#research" className="hover:text-[#191817] transition-colors">Research</a>
             <a href="#actions" className="hover:text-[#191817] transition-colors">Actions</a>
           </nav>
-          <div className="flex items-center gap-5">
-            <a href="#start" className="hidden sm:inline text-[13px] text-[#77736C] hover:text-[#191817] transition-colors">
-              Sign in
-            </a>
-            <Link href="/start" className="btn btn-ghost !py-2 !px-4 text-[13px]">
-              Start exploring
-            </Link>
-          </div>
+          <AccountMenu />
         </header>
 
         {/* ---------- Hero ---------- */}

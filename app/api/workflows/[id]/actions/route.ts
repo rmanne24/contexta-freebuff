@@ -1,8 +1,19 @@
 import { NextResponse } from 'next/server';
 import { proposeAction, approveAction, rejectAction, executeAction } from '@/lib/pipeline';
+import { sessionFromRequest } from '@/lib/auth';
+import { getWorkflow } from '@/lib/pipeline';
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
+
+  // Ownership check: signed-in users act only on their own workflows.
+  const w = await getWorkflow(id);
+  if (!w) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
+  const session = sessionFromRequest(req);
+  if (w.userId && (!session || session.id !== w.userId)) {
+    return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
+  }
+
   try {
     const body = (await req.json()) as { op?: string; recommendationId?: string };
 
@@ -18,8 +29,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
         await approveAction(id);
         // Execution runs asynchronously; the UI polls /api/workflows/[id].
         void executeAction(id).catch(() => undefined);
-        const w = await getWorkflow2(id);
-        return NextResponse.json(w);
+        const w2 = await getWorkflow(id);
+        return NextResponse.json(w2);
       }
       case 'reject': {
         const w = await rejectAction(id);
@@ -36,7 +47,3 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
 }
 
-async function getWorkflow2(id: string) {
-  const { getWorkflow } = await import('@/lib/pipeline');
-  return getWorkflow(id);
-}

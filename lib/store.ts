@@ -4,8 +4,10 @@ import type { WorkflowState, WorkflowSnapshot } from './types';
 
 /**
  * JSON-file-backed store. One file per workflow under .data/workflows.
- * Swap this module for Supabase/FastAPI persistence later without
- * touching the pipeline or the UI (same function signatures).
+ * Workflows may be owned by a user (userId) or anonymous (userId undefined)
+ * so a visitor can run one research before signing in; on sign-in those
+ * are adopted. Swap this module for Supabase/FastAPI persistence later
+ * without touching the pipeline or the UI (same function signatures).
  */
 
 const DATA_DIR = path.join(process.cwd(), '.data', 'workflows');
@@ -34,38 +36,74 @@ export async function loadWorkflow(id: string): Promise<WorkflowState | null> {
   }
 }
 
-export async function listWorkflows(): Promise<WorkflowSnapshot[]> {
+async function readAll(): Promise<WorkflowState[]> {
   let files: string[] = [];
   try {
     files = await fs.readdir(DATA_DIR);
   } catch {
     return [];
   }
-  const snapshots: WorkflowSnapshot[] = [];
+  const out: WorkflowState[] = [];
   for (const f of files) {
     if (!f.endsWith('.json')) continue;
     try {
       const raw = await fs.readFile(path.join(DATA_DIR, f), 'utf8');
-      const w = JSON.parse(raw) as WorkflowState;
-      snapshots.push({
-        id: w.id,
-        updatedAt: w.updatedAt,
-        state: w.state,
-        summary: null,
-        sources: w.sources,
-        evidence: w.evidence,
-        alignment: w.alignment,
-        gaps: w.gaps,
-        recommendations: w.recommendations,
-        action: w.action,
-        approval: w.approval,
-        execution: w.execution,
-      });
+      out.push(JSON.parse(raw) as WorkflowState);
     } catch {
       /* skip corrupt files */
     }
   }
-  return snapshots.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return out;
+}
+
+function snapshot(w: WorkflowState): WorkflowSnapshot {
+  return {
+    id: w.id,
+    updatedAt: w.updatedAt,
+    state: w.state,
+    summary: null,
+    sources: w.sources,
+    evidence: w.evidence,
+    alignment: w.alignment,
+    gaps: w.gaps,
+    recommendations: w.recommendations,
+    action: w.action,
+    approval: w.approval,
+    execution: w.execution,
+  };
+}
+
+/** Workflows owned by a user (newest first). */
+export async function listWorkflows(userId: string): Promise<WorkflowSnapshot[]> {
+  const all = await readAll();
+  return all
+    .filter((w) => w.userId === userId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map(snapshot);
+}
+
+/** Anonymous (pre-sign-in) workflows, newest first. */
+export async function listAnonymousWorkflows(): Promise<WorkflowSnapshot[]> {
+  const all = await readAll();
+  return all
+    .filter((w) => !w.userId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map(snapshot);
+}
+
+/** On first sign-in, claim the anonymous workflows created in this browser session window. */
+export async function adoptAnonymousWorkflows(userId: string): Promise<number> {
+  const all = await readAll();
+  const cutoff = Date.now() - 1000 * 60 * 60 * 24; // last 24h
+  let adopted = 0;
+  for (const w of all) {
+    if (w.userId) continue;
+    if (new Date(w.createdAt).getTime() < cutoff) continue;
+    w.userId = userId;
+    await saveWorkflow(w);
+    adopted++;
+  }
+  return adopted;
 }
 
 export function newId(): string {

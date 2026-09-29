@@ -1,9 +1,10 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Wordmark, Eyebrow, Spinner } from '@/components/ui';
+import { AccountMenu } from '@/components/AuthHeaderBits';
 
 interface StartState {
   step: 1 | 2 | 3;
@@ -31,6 +32,31 @@ export default function StartPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [prefilled, setPrefilled] = useState(false);
+
+  // Personalization: prefill the project from the user's most recent workflow.
+  useEffect(() => {
+    if (prefilled) return;
+    setPrefilled(true);
+    fetch('/api/me', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { user?: { lastProjectId?: string } | null }) => {
+        const last = d.user?.lastProjectId;
+        if (!last) return;
+        return fetch(`/api/workflows/${last}`, { cache: 'no-store' })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((w: { project?: { name?: string; description?: string; repoUrl?: string } } | null) => {
+            if (!w?.project) return;
+            setS((p) => ({
+              ...p,
+              projectName: w.project?.name || p.projectName,
+              projectDescription: w.project?.description || p.projectDescription,
+              repoUrl: w.project?.repoUrl || p.repoUrl,
+            }));
+          });
+      })
+      .catch(() => undefined);
+  }, [prefilled]);
 
   const set = <K extends keyof StartState>(k: K, v: StartState[K]) => setS((p) => ({ ...p, [k]: v }));
 
@@ -101,6 +127,7 @@ export default function StartPage() {
           <span className="text-[12px] tabular-nums text-[#A6A099]" aria-live="polite">
             {String(s.step).padStart(2, '0')} / 03
           </span>
+          <AccountMenu />
         </header>
 
         <div className="flex-1 flex flex-col justify-center py-12">

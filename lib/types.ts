@@ -116,6 +116,7 @@ export interface WorkflowState {
   id: string;
   createdAt: string;
   updatedAt: string;
+  userId?: string;
   state:
     | 'IDLE'
     | 'RESEARCHING'

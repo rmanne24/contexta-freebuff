@@ -11,14 +11,18 @@ import { createIssue, verifyIssue, verifyRepo, integrityHash, hasGitHubCredentia
  * All research is real (live fetch); all actions are real (GitHub API).
  */
 
-export async function startWorkflow(input: {
-  project: { name: string; description: string; repoUrl?: string; audience?: string; stage?: string; problem?: string };
-  opportunity: { kind?: string; title?: string; url?: string; description?: string; organization?: string; goal?: string };
-}): Promise<WorkflowState> {
+export async function startWorkflow(
+  input: {
+    project: { name: string; description: string; repoUrl?: string; audience?: string; stage?: string; problem?: string };
+    opportunity: { kind?: string; title?: string; url?: string; description?: string; organization?: string; goal?: string };
+  },
+  userId?: string
+): Promise<WorkflowState> {
   const state: WorkflowState = {
     id: newId(),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    userId,
     state: 'RESEARCHING',
     project: {
       name: input.project.name?.trim() || 'Untitled project',
@@ -227,6 +231,17 @@ export async function executeAction(id: string): Promise<WorkflowState> {
   if (!w) throw new Error('Workflow not found');
   if (!w.action) throw new Error('No proposed action to execute.');
   if (w.approval !== 'approved') throw new Error('Action has not been approved.');
+
+  // Prefer the signed-in user's own GitHub key, then the server token.
+  let githubToken: string | null = null;
+  if (w.userId) {
+    const { getDecryptedKey } = await import('./userStore');
+    githubToken = (await getDecryptedKey(w.userId, 'github')) || process.env.GITHUB_TOKEN || null;
+  } else {
+    githubToken = process.env.GITHUB_TOKEN || null;
+  }
+  const { setGitHubToken } = await import('./github');
+  setGitHubToken(githubToken);
 
   const steps =
     w.execution?.steps && w.execution.steps.length

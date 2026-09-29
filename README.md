@@ -32,12 +32,29 @@ Open http://localhost:3000.
 ## Environment
 
 ```bash
-# Optional — enables real GitHub issue execution:
+# Session signing + key-vault encryption (required for sign-in):
+AUTH_SECRET=<openssl rand -base64 32>
+
+# Google sign-in (https://console.cloud.google.com/apis/credentials):
+#   Authorized redirect URI: <origin>/api/auth/google/callback
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+
+# Optional fallback for GitHub execution (each user can connect their own in Settings):
 GITHUB_TOKEN=github_pat_...
 ```
 
-Without a token, everything works except the final "Approve & execute" step, which explains
-what it would do. Research and analysis are fully functional without any keys.
+Copy `.env.example` to `.env.local` and fill in what you need.
+
+## Auth & personalization
+
+- **Sign in with Google** — stateless signed-cookie sessions (HMAC-SHA256, no auth dependency).
+- **Per-user workspaces** — every research trail is owned by the signed-in user; anonymous
+  workflows created before signing in are adopted on first sign-in.
+- **API key vault** — users connect their own GitHub / OpenAI / Anthropic / Gemini / SerpAPI keys
+  in Settings. Keys are encrypted at rest (AES-256-GCM, scrypt-derived from `AUTH_SECRET`),
+  shown only masked in the UI, and decrypted server-side only when an approved action needs them.
+  Approved GitHub actions run as *the user*, with the server token as fallback.
 
 ## Routes
 
