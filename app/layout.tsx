@@ -17,7 +17,10 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: 'Contexta — Your AI Opportunity Operating System',
+  title: {
+    default: 'Contexta',
+    template: '%s — Contexta',
+  },
   description:
     'Contexta researches the opportunity, connects it to your work with evidence, and turns the next step into an action you can approve.',
 };
