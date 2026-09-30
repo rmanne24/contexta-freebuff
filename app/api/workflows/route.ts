@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { startWorkflow, runResearch } from '@/lib/pipeline';
 import { listWorkflows } from '@/lib/store';
 import { sessionFromRequest } from '@/lib/auth';
@@ -39,8 +39,10 @@ export async function POST(req: Request) {
       session?.id
     );
     if (session) void setLastProject(session.id, w.id);
-    // Fire-and-forget: research runs in-process while the UI polls state.
-    void runResearch(w.id).catch(() => undefined);
+    // Keep execution context alive in Vercel serverless functions
+    after(async () => {
+      await runResearch(w.id).catch(() => undefined);
+    });
     return NextResponse.json({ id: w.id, state: w.state }, { status: 201 });
   } catch (e) {
     return NextResponse.json(

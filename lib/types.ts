@@ -141,9 +141,62 @@ export interface WorkflowState {
   approval: 'pending' | 'approved' | 'rejected' | null;
   execution: ExecutionResult | null;
   error?: { phase: string; message: string };
+  presentation?: PresentationData;
+}
+
+export interface PresentationMistake {
+  id: string;
+  slideNumber?: number;
+  category: 'structure' | 'readability' | 'rubric' | 'evidence' | 'delivery';
+  severity: 'critical' | 'warning' | 'tip';
+  title: string;
+  explanation: string;
+  fix: string;
+}
+
+export interface SlideAnalysis {
+  slideNumber: number;
+  title: string;
+  detectedType: 'title' | 'problem' | 'solution' | 'architecture' | 'demo' | 'market' | 'metrics' | 'team' | 'conclusion' | 'general';
+  wordCount: number;
+  status: 'good' | 'warning' | 'critical';
+  feedback: string[];
+}
+
+export interface PresentationReview {
+  filename: string;
+  uploadedAt: string;
+  slideCount: number;
+  totalWords: number;
+  avgWordsPerSlide: number;
+  overallScore: number;
+  grade: 'A' | 'B' | 'C' | 'Needs Work';
+  categoryScores: {
+    structure: number;
+    readability: number;
+    rubricAlignment: number;
+    evidenceAndDemo: number;
+  };
+  summary: string;
+  criticalMistakes: PresentationMistake[];
+  warnings: PresentationMistake[];
+  strengths: string[];
+  slideBreakdown: SlideAnalysis[];
+  opportunityMatches: {
+    matchedCriteria: string[];
+    missingCriteria: string[];
+  };
+}
+
+export interface PresentationData {
+  filename: string;
+  uploadedAt: string;
+  slideCount: number;
+  rawOutline?: string;
+  review: PresentationReview;
 }
 
 export type WorkflowSnapshot = Pick<
   WorkflowState,
   'id' | 'updatedAt' | 'state' | 'sources' | 'evidence' | 'alignment' | 'gaps' | 'recommendations' | 'action' | 'approval' | 'execution'
-> & { summary: string | null };
+> & { summary: string | null; presentation?: PresentationData };

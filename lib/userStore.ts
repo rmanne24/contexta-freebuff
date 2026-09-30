@@ -9,7 +9,11 @@ import path from 'path';
  * the UI only ever receives masked previews and capability booleans.
  */
 
-const DATA_DIR = path.join(process.cwd(), '.data', 'users');
+import { getRedis } from './redis';
+
+const DATA_DIR = process.env.VERCEL
+  ? path.join('/tmp', '.data', 'users')
+  : path.join(process.cwd(), '.data', 'users');
 
 export interface UserRecord {
   id: string;
@@ -65,6 +69,16 @@ function fileFor(userId: string): string {
 }
 
 export async function getUser(userId: string): Promise<UserRecord | null> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get<UserRecord>(`user:${userId}`);
+      return data || null;
+    } catch (e) {
+      console.error('Redis getUser error:', e);
+    }
+  }
+
   try {
     const raw = await fs.readFile(fileFor(userId), 'utf8');
     return JSON.parse(raw) as UserRecord;
@@ -96,6 +110,16 @@ export async function upsertUserFromGoogle(p: {
 }
 
 export async function saveUser(rec: UserRecord): Promise<void> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.set(`user:${rec.id}`, rec);
+      return;
+    } catch (e) {
+      console.error('Redis saveUser error:', e);
+    }
+  }
+
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(fileFor(rec.id), JSON.stringify(rec, null, 2), 'utf8');
 }

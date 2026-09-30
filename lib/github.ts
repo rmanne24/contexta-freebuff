@@ -16,7 +16,7 @@ export interface GitHubIssueResult {
 }
 
 export function hasGitHubCredentials(): boolean {
-  return Boolean(process.env.GITHUB_TOKEN);
+  return Boolean(overrideToken || process.env.GITHUB_TOKEN);
 }
 
 function repoApi(repo: string): string {

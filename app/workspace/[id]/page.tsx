@@ -10,6 +10,7 @@ import { ResearchProgress } from '@/components/workspace/ResearchProgress';
 import { SourceList, SourceSheetBody } from '@/components/workspace/SourceList';
 import { AlignmentSection, GapSection, RecommendationSection } from '@/components/workspace/Analysis';
 import { ApprovalPanel, ExecutionTimeline, VerificationReceipt } from '@/components/workspace/ActionFlow';
+import { DeckReviewSection } from '@/components/workspace/DeckReviewSection';
 
 const STATE_LABEL: Record<string, string> = {
   IDLE: 'Idle',
@@ -182,6 +183,8 @@ export default function WorkspacePage() {
                 {w.alignment.length > 0 && <AlignmentSection alignment={w.alignment} evidence={w.evidence} sources={w.sources} />}
 
                 {w.gaps.length > 0 && <GapSection gaps={w.gaps} evidence={w.evidence} sources={w.sources} />}
+
+                <DeckReviewSection workflow={w} onUpdate={setW} />
 
                 {w.recommendations.length > 0 && (
                   <RecommendationSection

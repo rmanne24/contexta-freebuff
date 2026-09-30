@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { proposeAction, approveAction, rejectAction, executeAction } from '@/lib/pipeline';
 import { sessionFromRequest } from '@/lib/auth';
 import { getWorkflow } from '@/lib/pipeline';
@@ -27,8 +27,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       }
       case 'approve': {
         await approveAction(id);
-        // Execution runs asynchronously; the UI polls /api/workflows/[id].
-        void executeAction(id).catch(() => undefined);
+        // Execution runs in background; after() keeps Vercel Lambda alive until completion
+        after(async () => {
+          await executeAction(id).catch(() => undefined);
+        });
         const w2 = await getWorkflow(id);
         return NextResponse.json(w2);
       }

@@ -10,7 +10,11 @@ import type { WorkflowState, WorkflowSnapshot } from './types';
  * without touching the pipeline or the UI (same function signatures).
  */
 
-const DATA_DIR = path.join(process.cwd(), '.data', 'workflows');
+import { getRedis } from './redis';
+
+const DATA_DIR = process.env.VERCEL
+  ? path.join('/tmp', '.data', 'workflows')
+  : path.join(process.cwd(), '.data', 'workflows');
 
 function safeId(): string {
   return `wf_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
@@ -22,12 +26,38 @@ function fileFor(id: string): string {
 }
 
 export async function saveWorkflow(state: WorkflowState): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
   state.updatedAt = new Date().toISOString();
+  const redis = getRedis();
+  if (redis) {
+    try {
+      await redis.set(`wf:${state.id}`, state);
+      await redis.sadd('wf:all', state.id);
+      if (state.userId) {
+        await redis.sadd(`wf:user:${state.userId}`, state.id);
+      } else {
+        await redis.sadd('wf:anon', state.id);
+      }
+      return;
+    } catch (e) {
+      console.error('Redis saveWorkflow error:', e);
+    }
+  }
+
+  await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.writeFile(fileFor(state.id), JSON.stringify(state, null, 2), 'utf8');
 }
 
 export async function loadWorkflow(id: string): Promise<WorkflowState | null> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const data = await redis.get<WorkflowState>(`wf:${id}`);
+      return data || null;
+    } catch (e) {
+      console.error('Redis loadWorkflow error:', e);
+    }
+  }
+
   try {
     const raw = await fs.readFile(fileFor(id), 'utf8');
     return JSON.parse(raw) as WorkflowState;
@@ -75,6 +105,24 @@ function snapshot(w: WorkflowState): WorkflowSnapshot {
 
 /** Workflows owned by a user (newest first). */
 export async function listWorkflows(userId: string): Promise<WorkflowSnapshot[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const ids = await redis.smembers(`wf:user:${userId}`);
+      if (!ids || ids.length === 0) return [];
+      const list: WorkflowState[] = [];
+      for (const id of ids) {
+        const item = await redis.get<WorkflowState>(`wf:${id}`);
+        if (item) list.push(item);
+      }
+      return list
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map(snapshot);
+    } catch (e) {
+      console.error('Redis listWorkflows error:', e);
+    }
+  }
+
   const all = await readAll();
   return all
     .filter((w) => w.userId === userId)
@@ -84,6 +132,24 @@ export async function listWorkflows(userId: string): Promise<WorkflowSnapshot[]>
 
 /** Anonymous (pre-sign-in) workflows, newest first. */
 export async function listAnonymousWorkflows(): Promise<WorkflowSnapshot[]> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const ids = await redis.smembers('wf:anon');
+      if (!ids || ids.length === 0) return [];
+      const list: WorkflowState[] = [];
+      for (const id of ids) {
+        const item = await redis.get<WorkflowState>(`wf:${id}`);
+        if (item) list.push(item);
+      }
+      return list
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map(snapshot);
+    } catch (e) {
+      console.error('Redis listAnonymousWorkflows error:', e);
+    }
+  }
+
   const all = await readAll();
   return all
     .filter((w) => !w.userId)
@@ -93,6 +159,27 @@ export async function listAnonymousWorkflows(): Promise<WorkflowSnapshot[]> {
 
 /** On first sign-in, claim the anonymous workflows created in this browser session window. */
 export async function adoptAnonymousWorkflows(userId: string): Promise<number> {
+  const redis = getRedis();
+  if (redis) {
+    try {
+      const anonIds = await redis.smembers('wf:anon');
+      let adopted = 0;
+      for (const id of anonIds) {
+        const item = await redis.get<WorkflowState>(`wf:${id}`);
+        if (item) {
+          item.userId = userId;
+          await redis.set(`wf:${id}`, item);
+          await redis.sadd(`wf:user:${userId}`, id);
+          await redis.srem('wf:anon', id);
+          adopted++;
+        }
+      }
+      return adopted;
+    } catch (e) {
+      console.error('Redis adoptAnonymousWorkflows error:', e);
+    }
+  }
+
   const all = await readAll();
   const cutoff = Date.now() - 1000 * 60 * 60 * 24; // last 24h
   let adopted = 0;
