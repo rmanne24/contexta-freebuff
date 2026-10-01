@@ -541,7 +541,7 @@ function rubricCriteria(items?: RequirementItem[]): RequirementItem[] {
   return (items || []).filter(
     (i) =>
       i.status === 'verified' &&
-      ['selection_criterion', 'requirement', 'organizer_priority'].includes(i.category)
+      ['requirement', 'selection_criterion', 'application_material'].includes(i.category)
   );
 }
 

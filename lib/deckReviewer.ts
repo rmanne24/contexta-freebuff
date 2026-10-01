@@ -216,11 +216,13 @@ export function reviewPresentation(
   }
 
   // 3. Opportunity criteria — strictly from verified research, never invented.
-  // Only criteria the opportunity's own sources actually state are checked.
+  // Only explicit requirements, judging criteria, and application materials are
+  // checked. Prizes, certificates, workshops, and organizer marketing content
+  // are never scored against the deck.
   const criteriaItems = (intel?.items || []).filter(
     (i) =>
       i.status === 'verified' &&
-      ['selection_criterion', 'requirement', 'organizer_priority'].includes(i.category)
+      ['requirement', 'selection_criterion', 'application_material'].includes(i.category)
   );
   const rubricAvailable = criteriaItems.length > 0;
 

@@ -23,6 +23,8 @@ export type EvidenceType =
   | 'deadline'
   | 'selection_criterion'
   | 'organizer_priority'
+  /** Workshops, blog posts, marketing copy, event navigation — background only, never a requirement. */
+  | 'organizer_content'
   | 'project_evidence'
   | 'inference'
   | 'unknown';
@@ -96,7 +98,9 @@ export type RequirementCategory =
   | 'application_material'
   | 'selection_criterion'
   | 'deadline'
-  | 'organizer_priority';
+  | 'organizer_priority'
+  /** Workshops, marketing, event navigation — background context, never a requirement. */
+  | 'organizer_content';
 
 /** A structured fact extracted from real evidence (never invented). */
 export interface RequirementItem {

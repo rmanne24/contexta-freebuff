@@ -134,54 +134,75 @@ const MONTH =
   '(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*';
 
 const DEADLINE_RE = new RegExp(
-  `\\b(deadline|due (by|on)|closes? (on|at)?|closing date|last date|submissions? close|applications? close|apply by|submit (by|before)|entries close|final deadline|timeline)\\b|${MONTH}\\.?\\s+\\d{1,2}(st|nd|rd|th)?,?\\s+\\d{4}|\\d{1,2}\\s+${MONTH}`,
+  `\\b(deadline|due (by|on)|closes? (on|at)?|closing date|last date|submissions? close|applications? close|apply by|submit (by|before)|entries close|registrations? close|registration deadline|final deadline)\\b|${MONTH}\\.?\\s+\\d{1,2}(st|nd|rd|th)?,?\\s+\\d{4}|\\d{1,2}\\s+${MONTH}`,
   'i'
 );
 
+/** Qualification-form statements: who may participate. Not "teams are mentioned" but "who is allowed". */
 const ELIGIBILITY_RE =
-  /\b(eligib\w*|who can (apply|participate|enter|join)|open to\b|must be (a|an|at least|aged|18|21)|age of \d|teams? (of|must|may|can)|individuals? (and|or) teams?|students? (enrolled|at|currently)|residents? of|citizens? of|located in|based in|students? and|working professionals)\b/i;
+  /\b(eligib\w*|who can (apply|participate|enter|join)|open to\b|must be (a|an|aged|at least|currently|enrolled|based|located|residents?|citizens?)|age(d)? (between|over|under|of )?\d|years? old|students? (enrolled|currently|from)|working professionals?|final[- ]year|freshers?|undergraduates?|postgraduates?|graduate students?|residents? of|citizens? of|based in|located in|teams? of (up to )?(two|three|four|five|six|\d{1,2})|solo or a team|individuals? (only|or)|inter[- ]college|team size|are allowed)\b/i;
 
+/** Criterion-form only: how submissions are evaluated. "Announced after judging" is NOT a criterion. */
 const SELECTION_RE =
-  /\b(judg\w*|evaluat\w*|criteri\w*|rubric|scor(ed|ing)|selected (based|on)|winners? (will be|are|were) (chosen|selected|announced)|assess\w*|review process|selection process|applications? (are|will be) (reviewed|assessed))\b/i;
+  /\b(judged (on|for|by|against)|judging (criteria|rubric|panel|process|round)|evaluation criteria|selection criteria|criteri\w* (used|for|include|are)|rubric|scoring (criteria|system|guide|rubric)|scored (on|against)|assessed (on|against|for)|selected based on|winners? (are|will be) (chosen|selected) based|points (are|will be) awarded|how (entries|submissions|applications|projects) (are|will be) (judged|evaluated|assessed|scored))\b/i;
 
+/** Submit-form: what the applicant must hand in. Bare nouns like "materials" are too weak alone. */
 const APPLICATION_RE =
-  /\b(submit|submission|apply (with|using|by)|application (form|requires|should|must)|include (a|an|the|your|link|video|demo|repo|deck|pitch|document|screenshot)|provide (a|an|the|your|link|video)|attach|upload|deliverable|materials?|portfolio|resume|cv|proposal|pitch deck)\b/i;
+  /\b(submit (a|an|the|your)|submission (must|should|requires?|includes?)|must submit|should submit|required to submit|apply (with|using|by)|application (form|must|requires|should)|include (a|an|the|your) (link|video|demo|repo|deck|pitch|document|screenshot|resume|cv|recording)|provide (a|an|the|your) (link|video|demo|repo|deck|pitch|document)|attach|upload|deliverables?|pitch deck|portfolio|resume|cv)\b/i;
 
 const BENEFIT_RE =
-  /\b(prize|prizes|reward|cash|grant|funding|credits?|perks?|access to|incubat\w*|mentor\w*|award\w*|scholarship|stipend|equity|investment|opportunit(y|ies) to)\b/i;
+  /\b(prizes?|rewards?|cash|grants?|funding|credits?|perks?|certificates?|incubat\w*|mentor\w*|scholarships?|stipends?|equity|investment|access to)\b/i;
 
+/** Explicit organizer emphasis, incl. theme statements like "Learn to build with AI Agents". */
 const PRIORITY_RE =
-  /\b(we (care|value|look for|believe|want|are looking for|prioritize)|our (mission|focus|priority|priorities|goal|values)|mission is|focus(ed)? on|passionate about|dedicated to|we('re| are) (excited|looking) (about|for))\b/i;
+  /\b(we (care|value|look for|believe|want|are looking for|prioritize|focus)|our (mission|focus|priority|priorities|goal|values)|mission is|focus(ed|es)? on|passionate about|dedicated to|we('re| are) (excited|looking) (about|for)|emphasiz\w*|prioriti[sz]es?|learn to build)\b/i;
 
+/** Obligation-form only: what the applicant must build/provide/satisfy. Bare "required" is too weak. */
 const REQUIREMENT_RE =
-  /\b(must|required?|requirement|need(s)? to|should (be|include|have)|mandatory|ensure|only (projects|teams)|minimum|maximum|no (more|less) than|limit(ed)? to)\b/i;
+  /\b(must (build|use|include|submit|be|demonstrate|provide|have)|required to|requirements? (are|include|for)|need(s)? to|should (be|include|have|demonstrate)|mandatory|ensure|only (projects|teams)|no (more|less) than|limit(ed)? to|minimum|maximum)\b/i;
 
-const FACTUAL_TYPES: EvidenceType[] = [
-  'explicit_requirement',
-  'explicit_benefit',
-  'eligibility',
-  'application_material',
-  'deadline',
-  'selection_criterion',
-  'organizer_priority',
-];
+/** Workshops, courses, blog posts, marketing CTAs — background content, never a requirement. */
+const PROMO_CONTENT_RE =
+  /\b(workshops?|webinars?|masterclass(es)?|bootcamps?|courses?|curriculum|lessons?|blogs?|podcasts?|newsletters?|episodes?|tutorials?|meetups?|sessions?|cohorts?|start learning|register (now|here|on)|sign up|watch (now|on demand)|enroll\w*|conducted|led by|certificate of completion|past event|upcoming (event|session)|free (master|claude|course|workshop|webinar)|corporate training|demonstrated (how|using|to)|showed how to|explained (how|why|the differences|the concept)|(he|she|they) (then )?(demonstrated|showed|explained|walked through))\b/i;
+
+const NAV_OR_FOOTER_RE =
+  /((menu|sign in|log in|subscribe)\b|cookie|privacy policy|terms of service|all rights reserved|©|\u2197|next slide|previous slide|back to top|home courses|courses events|events contact)/i;
 
 /**
- * Classify a quote: what kind of fact does it establish, and how strongly?
- * Order matters — a deadline sentence may also contain “must”.
+ * A bare date range only establishes a deadline when the sentence is actually
+ * about the opportunity's schedule — not a copyright year or a blog post date.
+ */
+const SCHEDULE_CONTEXT_RE =
+  /\b(registr\w*|submit\w*|submissions?|applicat\w*|apply|deadline|closes?|closed|phase|event|timeline|schedule|runs?|live till|opens?)\b/i;
+
+/**
+ * Classify a quote by the semantic role of the statement — never by keyword
+ * presence. A source excerpt becomes a finding only if its form actually
+ * establishes that category; otherwise it falls to organizer content,
+ * inference, or unknown.
  */
 export function classifyEvidence(
   quote: string,
   sourceQuality: Source['quality']
 ): { type: EvidenceType; status: VerificationStatus } {
+  const s = quote.trim();
+
+  // Workshops, courses, marketing CTAs, event chrome: background content.
+  // This runs FIRST so promo copy can never become a requirement, no matter
+  // which trigger words it contains.
+  if (PROMO_CONTENT_RE.test(s)) return { type: 'organizer_content', status: 'inferred' };
+
   let type: EvidenceType = 'unknown';
-  if (DEADLINE_RE.test(quote)) type = 'deadline';
-  else if (ELIGIBILITY_RE.test(quote)) type = 'eligibility';
-  else if (SELECTION_RE.test(quote)) type = 'selection_criterion';
-  else if (APPLICATION_RE.test(quote)) type = 'application_material';
-  else if (BENEFIT_RE.test(quote)) type = 'explicit_benefit';
-  else if (PRIORITY_RE.test(quote)) type = 'organizer_priority';
-  else if (REQUIREMENT_RE.test(quote)) type = 'explicit_requirement';
+  if (DEADLINE_RE.test(s)) type = 'deadline';
+  else if (ELIGIBILITY_RE.test(s)) type = 'eligibility';
+  else if (SELECTION_RE.test(s)) type = 'selection_criterion';
+  else if (APPLICATION_RE.test(s)) type = 'application_material';
+  else if (BENEFIT_RE.test(s)) type = 'explicit_benefit';
+  else if (PRIORITY_RE.test(s)) type = 'organizer_priority';
+  else if (REQUIREMENT_RE.test(s)) type = 'explicit_requirement';
+
+  // A date range with no schedule context is not evidence of a deadline.
+  if (type === 'deadline' && !SCHEDULE_CONTEXT_RE.test(s)) type = 'unknown';
 
   if (type === 'unknown') return { type, status: 'unverified' };
   if (sourceQuality === 'official') return { type, status: 'verified' };
@@ -202,6 +223,10 @@ const FILLER_LEAD =
 export function condense(raw: string, max = 190): string {
   let s = raw.replace(/\s+/g, ' ').trim();
   s = s.replace(/^[•·▪◦\-–—*]\s*/, '');
+  // Strip list numbering / accordion markers left over from page extraction.
+  s = s.replace(/^(\d{1,2}[.)]|\d{1,2}|[Qq]\d{1,2})\s+/, '');
+  s = s.replace(/^[+>]\s*/, '');
+  s = s.replace(/\s+[+>]\s+/g, ' ');
   s = s.replace(FILLER_LEAD, '');
   let truncated = false;
   if (s.length > max) {
@@ -259,7 +284,29 @@ const CRITICAL_TERMS = [
 ];
 
 const NAV_JUNK_RE =
-  /(menu|sign in|log in|subscribe|cookie|privacy policy|terms of service|all rights reserved|copyright ©|newsletter|copyright 20)/i;
+  /(menu|sign in|log in|subscribe|cookie|privacy policy|terms of service|all rights reserved|copyright 20|newsletter|©|\u2197|next slide|previous slide|back to top|home courses|courses events|events contact)/i;
+
+/** Sorting preference: substantive opportunity facts first, background context last. */
+function factRank(type: EvidenceType): number {
+  switch (type) {
+    case 'deadline':
+    case 'eligibility':
+      return 6;
+    case 'explicit_requirement':
+    case 'selection_criterion':
+    case 'application_material':
+      return 5;
+    case 'explicit_benefit':
+      return 4;
+    case 'organizer_priority':
+      return 3;
+    case 'inference':
+    case 'organizer_content':
+      return 1;
+    default:
+      return 0;
+  }
+}
 
 /** Extract evidence: real quotes from retrieved source text. */
 export function extractEvidence(
@@ -291,13 +338,15 @@ export function extractEvidence(
       .filter((x) => {
         if (x.s.length < 40 || x.s.length > 320) return false;
         if (NAV_JUNK_RE.test(x.s)) return false;
+        // Workshops, marketing, event chrome are never kept as evidence.
+        if (x.classification.type === 'organizer_content') return false;
         // Keep classified facts, or sentences clearly about the opportunity.
         if (x.classification.type !== 'unknown') return true;
         return x.overlap >= 2;
       })
       .sort(
         (a, b) =>
-          Number(b.classification.type !== 'unknown') - Number(a.classification.type !== 'unknown') ||
+          factRank(b.classification.type) - factRank(a.classification.type) ||
           Number(b.critHit) - Number(a.critHit) ||
           b.overlap - a.overlap
       );
@@ -345,6 +394,7 @@ const CATEGORY_LABEL: Record<RequirementCategory, string> = {
   deadline: 'Deadlines',
   benefit: 'Benefits',
   organizer_priority: 'Organizer priorities',
+  organizer_content: 'General organizer content',
 };
 
 const TYPE_TO_CATEGORY: Partial<Record<EvidenceType, RequirementCategory>> = {
@@ -378,6 +428,8 @@ export function buildIntel(
       if (count >= 5) break;
       const cat = ev.type ? TYPE_TO_CATEGORY[ev.type] : undefined;
       if (cat !== category) continue;
+      // Background content (workshops, marketing, navigation) is never a finding.
+      if (ev.type === 'organizer_content') continue;
       if (ev.status === 'unverified') continue;
       const key = ev.claim.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 80);
       if (seen.has(key)) continue;
@@ -728,10 +780,12 @@ function computeGaps(
     if (inProj) continue;
 
     // Was this required by the opportunity, or is it a strategic strengthening step?
+    // Organizer priorities are emphasis, not obligations — they never make a gap "required".
     const oppEv = evidence
       .filter(
         (e) =>
           e.status === 'verified' &&
+          e.type !== 'organizer_priority' &&
           c.requirementTerms.some((t) => (e.claim + ' ' + e.quote).toLowerCase().includes(t))
       )
       .slice(0, 2);

@@ -136,8 +136,11 @@ export async function runResearch(id: string): Promise<WorkflowState> {
         );
         src.quality = sourceQuality(page.finalUrl || url, domainOf(page.finalUrl || url), seedHosts);
         sources.push(src);
-        // When no real title was provided (URL placeholder), adopt the page's own title.
-        const titleLooksLikeUrl = !w.opportunity.title || /^https?:\/\//.test(w.opportunity.title);
+        // When no real title was provided (URL or fallback placeholder), adopt the page's own title.
+        const titleLooksLikeUrl =
+          !w.opportunity.title ||
+          /^https?:\/\//.test(w.opportunity.title) ||
+          /^untitled opportunity$/i.test(w.opportunity.title);
         if (titleLooksLikeUrl && page.finalUrl === (w.opportunity.url || url) && page.title) {
           w.opportunity.title = trimToWordBoundary(page.title, 80);
         }

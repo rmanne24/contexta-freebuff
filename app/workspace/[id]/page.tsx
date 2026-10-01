@@ -46,6 +46,19 @@ const FINDING_LABEL: Record<RequirementCategory, string> = {
   deadline: 'Deadline',
   benefit: 'Benefit',
   organizer_priority: 'Organizer priority',
+  organizer_content: 'Organizer content',
+};
+
+/** What matters: qualification, obligations, submission, judging, timing, awards — in that order. */
+const FINDING_WEIGHT: Record<RequirementCategory, number> = {
+  eligibility: 6,
+  requirement: 5,
+  application_material: 4,
+  selection_criterion: 3,
+  deadline: 4,
+  benefit: 2,
+  organizer_priority: 1,
+  organizer_content: 0,
 };
 
 export default function WorkspacePage() {
@@ -157,9 +170,16 @@ export default function WorkspacePage() {
   const otherCount = retrieved.length - officialCount - projectCount;
   const confidence = w.intel?.researchConfidence;
 
+  // Only high-value findings belong here — never workshops, marketing copy,
+  // navigation text, or prize announcements.
   const keyFindings: RequirementItem[] = (w.intel?.items || [])
+    .filter((i) => i.category !== 'organizer_content')
     .slice()
-    .sort((a, b) => (a.status === 'verified' ? 0 : 1) - (b.status === 'verified' ? 0 : 1))
+    .sort(
+      (a, b) =>
+        (a.status === 'verified' ? 0 : 1) - (b.status === 'verified' ? 0 : 1) ||
+        (FINDING_WEIGHT[b.category] || 0) - (FINDING_WEIGHT[a.category] || 0)
+    )
     .slice(0, 5);
 
   const sourceOfItem = (item: RequirementItem): Source | undefined => {

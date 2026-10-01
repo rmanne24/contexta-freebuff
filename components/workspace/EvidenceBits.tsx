@@ -76,6 +76,7 @@ const TYPE_LABEL: Record<EvidenceType, string> = {
   deadline: 'Deadline',
   selection_criterion: 'Selection criterion',
   organizer_priority: 'Organizer priority',
+  organizer_content: 'Organizer content',
   project_evidence: 'Project evidence',
   inference: 'Inference',
   unknown: 'Context',

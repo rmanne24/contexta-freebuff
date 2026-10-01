@@ -24,6 +24,7 @@ const CATEGORY_LABEL: Record<RequirementCategory, string> = {
   deadline: 'Deadlines',
   benefit: 'Benefits',
   organizer_priority: 'Organizer priorities',
+  organizer_content: 'General organizer content',
 };
 
 const CONFIDENCE_META: Record<
