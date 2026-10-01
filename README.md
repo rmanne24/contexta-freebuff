@@ -13,6 +13,17 @@ intelligence loop on it:
 - **Action** — Contexta proposes a concrete action (e.g. open a GitHub issue) and **waits for approval**.
 - **Verification** — approved actions are executed, then re-verified at the source, with an integrity-hash receipt.
 
+# Project Presentation
+
+## 🎥 Demo Video
+[Watch the project demo on YouTube](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
+
+## 📊 Project Presentation
+[View the PowerPoint presentation on Google Drive](https://drive.google.com/file/d/1nUvi-OuNXgOo02O-Rat9IrZYHQLYixco/view?usp=sharing)
+
+
+
+
 ## Stack
 
 - Next.js (App Router) + TypeScript + Tailwind CSS 4
