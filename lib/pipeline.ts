@@ -1,9 +1,16 @@
-import type { WorkflowAction, WorkflowState, Source } from './types';
+import type { WorkflowAction, WorkflowState, Source, ProjectEvidence } from './types';
 import { loadWorkflow, newId, saveWorkflow } from './store';
-import { analyze, seedUrls, mkSource, type AnalyzeResult } from './analyzer';
-import { fetchPage, discoverLinks, metaDescription } from './fetcher';
-import { classifyKind, domainOf, sentences } from './utils';
-import { createIssue, verifyIssue, verifyRepo, integrityHash, hasGitHubCredentials } from './github';
+import { analyze, extractProjectEvidence, seedUrls, mkSource, type AnalyzeResult } from './analyzer';
+import { fetchPage, discoverLinks, metaDescription, sourceQuality } from './fetcher';
+import { classifyKind, domainOf, sentences, trimToWordBoundary } from './utils';
+import {
+  createIssue,
+  verifyIssue,
+  verifyRepo,
+  integrityHash,
+  hasGitHubCredentials,
+  fetchRepoContext,
+} from './github';
 
 /**
  * Server-side workflow pipeline. Owns the full state machine:
@@ -77,13 +84,24 @@ export async function runResearch(id: string): Promise<WorkflowState> {
 
     if (seeds.length) {
       const discovered = await discoverLinks(seeds, 6, {
-        keywords: /criteri|judg|rule|prize|track|faq|deadline|submission|guideline|challenge|hackathon|build/i,
+        keywords:
+          /eligib|apply|application|faq|criteri|judg|rubric|rule|prize|track|deadline|timeline|submission|submit|guideline|requirement|format|detail|instruction/i,
       });
       candidates.push(...discovered);
     }
 
     const repoUrl = w.project.repoUrl ? normalizeRepoUrl(w.project.repoUrl) : null;
     if (repoUrl) candidates.push(repoUrl);
+
+    const seedHosts = seeds
+      .map((s) => {
+        try {
+          return domainOf(s);
+        } catch {
+          return '';
+        }
+      })
+      .filter(Boolean);
 
     const seenTitles = new Set<string>();
     const unique: string[] = [];
@@ -107,14 +125,27 @@ export async function runResearch(id: string): Promise<WorkflowState> {
           metaDescription(page.rawHtml) ||
           sentences(page.text).slice(0, 2).join(' ').slice(0, 320) ||
           page.title;
-        sources.push(
-          mkSource(idx, page.finalUrl || url, page.title, whyFor(url, w.opportunity.title), excerpt, page.wordCount, true)
+        const src = mkSource(
+          idx,
+          page.finalUrl || url,
+          page.title,
+          whyFor(url, w.opportunity.title),
+          excerpt,
+          page.wordCount,
+          true
         );
+        src.quality = sourceQuality(page.finalUrl || url, domainOf(page.finalUrl || url), seedHosts);
+        sources.push(src);
+        // When no real title was provided (URL placeholder), adopt the page's own title.
+        const titleLooksLikeUrl = !w.opportunity.title || /^https?:\/\//.test(w.opportunity.title);
+        if (titleLooksLikeUrl && page.finalUrl === (w.opportunity.url || url) && page.title) {
+          w.opportunity.title = trimToWordBoundary(page.title, 80);
+        }
       } catch (e) {
-        sources.push(
-          mkSource(idx, url, domainOf(url), whyFor(url, w.opportunity.title), '', 0, false,
-            e instanceof Error ? e.message : 'Could not be retrieved')
-        );
+        const src = mkSource(idx, url, domainOf(url), whyFor(url, w.opportunity.title), '', 0, false,
+          e instanceof Error ? e.message : 'Could not be retrieved');
+        src.quality = sourceQuality(url, domainOf(url), seedHosts);
+        sources.push(src);
       }
       idx++;
     }
@@ -122,11 +153,31 @@ export async function runResearch(id: string): Promise<WorkflowState> {
     w.sources = sources;
     await saveWorkflow(w);
 
+    // ---- Read the user's repository for real project evidence ----
+    let projectEvidence: ProjectEvidence[] = [];
+    if (repoUrl) {
+      try {
+        let userGhToken: string | null = null;
+        if (w.userId) {
+          const { getDecryptedKey } = await import('./userStore');
+          userGhToken = await getDecryptedKey(w.userId, 'github');
+        }
+        const repoCtx = await fetchRepoContext(parseRepoSlug(repoUrl), userGhToken);
+        if (repoCtx.ok) {
+          projectEvidence = extractProjectEvidence(repoCtx, w.project, w.opportunity);
+        }
+      } catch {
+        /* repository evidence is additive — research continues without it */
+      }
+    }
+    w.projectEvidence = projectEvidence;
+
     // ---- Analyze over the real retrieved text ----
     w.state = 'ANALYZING';
     await saveWorkflow(w);
-    const result: AnalyzeResult = analyze(w.project, w.opportunity, sources, pageTexts);
+    const result: AnalyzeResult = analyze(w.project, w.opportunity, sources, pageTexts, projectEvidence);
     w.evidence = result.evidence;
+    w.intel = result.intel;
     w.alignment = result.alignment;
     w.gaps = result.gaps;
     w.recommendations = result.recommendations;
@@ -166,6 +217,13 @@ function normalizeRepoUrl(repoInput: string): string {
   if (m) return `https://github.com/${m[1]}/${m[2].replace(/\.git$/, '')}`;
   const bare = repoInput.match(/^([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)$/);
   return bare ? `https://github.com/${bare[1]}/${bare[2]}` : repoInput;
+}
+
+/** "owner/repo" for the GitHub API. */
+function parseRepoSlug(repoUrl: string): string {
+  const m = repoUrl.match(/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)/);
+  if (m) return `${m[1]}/${m[2].replace(/\.git$/, '')}`;
+  return repoUrl;
 }
 
 // ---- Actions ----

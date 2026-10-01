@@ -14,6 +14,15 @@ export function hash(s: string): string {
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
+/** Trim to max chars without cutting a word in half; collapses whitespace. */
+export function trimToWordBoundary(s: string, max: number): string {
+  const clean = (s || '').replace(/\s+/g, ' ').trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  const lastSpace = cut.lastIndexOf(' ');
+  return (lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd();
+}
+
 export function sentences(text: string): string[] {
   return text
     .replace(/\s+/g, ' ')

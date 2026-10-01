@@ -16,7 +16,6 @@ export function useMe(): { me: Me | null; loading: boolean; refresh: () => void 
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
     fetch('/api/me', { cache: 'no-store' })
       .then((r) => r.json())
       .then((d: Me) => {

@@ -2,6 +2,7 @@ import type {
   EvidenceItem,
   GapFinding,
   Opportunity,
+  OpportunityIntel,
   PresentationMistake,
   PresentationReview,
   ProjectProfile,
@@ -54,7 +55,8 @@ export function reviewPresentation(
   opportunity: Opportunity,
   project: ProjectProfile,
   evidence: EvidenceItem[] = [],
-  gaps: GapFinding[] = []
+  gaps: GapFinding[] = [],
+  intel?: OpportunityIntel
 ): PresentationReview {
   const { slides, filename, totalWords, slideCount } = parsed;
   const avgWordsPerSlide = slideCount > 0 ? Math.round(totalWords / slideCount) : 0;
@@ -213,48 +215,51 @@ export function reviewPresentation(
     });
   }
 
-  // 3. Opportunity Rubric Alignment Checks
-  const oppKeywords = [
-    ...(opportunity.title || '').toLowerCase().match(/[a-z][a-z0-9+#.-]{3,}/g) || [],
-    ...(opportunity.description || '').toLowerCase().match(/[a-z][a-z0-9+#.-]{3,}/g) || [],
-    ...(opportunity.goal || '').toLowerCase().match(/[a-z][a-z0-9+#.-]{3,}/g) || [],
-  ];
+  // 3. Opportunity criteria — strictly from verified research, never invented.
+  // Only criteria the opportunity's own sources actually state are checked.
+  const criteriaItems = (intel?.items || []).filter(
+    (i) =>
+      i.status === 'verified' &&
+      ['selection_criterion', 'requirement', 'organizer_priority'].includes(i.category)
+  );
+  const rubricAvailable = criteriaItems.length > 0;
 
-  // Specific high-value technical themes
-  const rubricThemes = [
-    { label: 'Autonomous Agents & Autonomy', terms: ['agent', 'autonomous', 'workflow', 'orchestrat'] },
-    { label: 'Memory & State Persistence', terms: ['memory', 'persistent', 'state', 'qdrant', 'vector'] },
-    { label: 'Evaluation & Benchmarks', terms: ['evaluation', 'benchmark', 'metric', 'accuracy', 'rubric'] },
-    { label: 'Human Oversight / Approval', terms: ['human', 'approval', 'oversight', 'review', 'verify'] },
-    { label: 'Open Source / Deployment', terms: ['deploy', 'open source', 'production', 'github', 'live'] },
-    { label: 'Voice / Multimodal Interaction', terms: ['voice', 'speech', 'audio', 'hardware', 'omi'] },
-  ];
+  const STOPWORDS = new Set([
+    'that', 'with', 'this', 'from', 'your', 'their', 'they', 'will', 'must', 'should', 'have',
+    'been', 'were', 'into', 'than', 'then', 'them', 'these', 'those', 'over', 'under', 'more',
+    'most', 'some', 'such', 'only', 'also', 'each', 'other', 'which', 'what', 'when', 'where',
+    'while', 'about', 'above', 'after', 'before', 'between', 'during', 'through', 'application',
+    'applicants', 'opportunity', 'project', 'solutions', 'solution',
+  ]);
+  const keywordsOf = (s: string): string[] =>
+    [...new Set((s.toLowerCase().match(/[a-z][a-z0-9+#.-]{3,}/g) || []).filter((w) => !STOPWORDS.has(w)))].slice(0, 8);
 
   const matchedCriteria: string[] = [];
   const missingCriteria: string[] = [];
 
-  for (const th of rubricThemes) {
-    const oppMentions = th.terms.some((t) => oppKeywords.includes(t));
-    if (!oppMentions) continue;
-
-    const deckMentions = th.terms.some((t) => fullDeckText.includes(t));
-    if (deckMentions) {
-      matchedCriteria.push(th.label);
+  criteriaItems.forEach((item, i) => {
+    const kws = keywordsOf(item.statement);
+    const hits = kws.filter((k) => fullDeckText.includes(k)).length;
+    const covered = kws.length === 0 ? false : kws.length === 1 ? hits >= 1 : hits >= 2;
+    const short = item.statement.length > 90 ? `${item.statement.slice(0, 90).replace(/\s+\S*$/, '')}…` : item.statement;
+    if (covered) {
+      matchedCriteria.push(short);
     } else {
-      missingCriteria.push(th.label);
+      missingCriteria.push(short);
+      const src = evidence.find((e) => item.evidenceIds.includes(e.id));
       criticalMistakes.push({
-        id: `crit_rubric_${th.label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        id: `crit_rubric_${i}`,
         category: 'rubric',
         severity: 'critical',
-        title: `Opportunity Rubric Mismatch: Missing "${th.label}"`,
-        explanation: `The target opportunity explicitly emphasizes "${th.label}", but your presentation does not mention how your project addresses it.`,
-        fix: `Add a bullet point or dedicated slide demonstrating how your project incorporates "${th.label}" to maximize judging points.`,
+        title: `Verified requirement not addressed: “${short}”`,
+        explanation: `The opportunity's own sources state: “${item.statement}”${src ? ` (source [${String(src.sourceIndex).padStart(2, '0')}])` : ''} Your deck does not appear to address it.`,
+        fix: 'Add a slide or bullet that directly addresses this requirement, backed by evidence from your project.',
       });
     }
-  }
+  });
 
   if (matchedCriteria.length > 0) {
-    strengths.push(`Directly addresses opportunity requirements: ${matchedCriteria.join(', ')}.`);
+    strengths.push(`Addresses verified opportunity requirements: ${matchedCriteria.slice(0, 3).join(' · ')}.`);
   }
 
   // 4. Calculate Category and Overall Scores
@@ -274,13 +279,12 @@ export function reviewPresentation(
   if (avgWordsPerSlide > 70) readabilityScore -= 4;
   readabilityScore = Math.max(0, readabilityScore);
 
-  // Rubric Alignment: 25 pts max
+  // Rubric Alignment: 25 pts max — only meaningful when verified criteria exist.
   let rubricScore = 25;
   const totalRubricItems = matchedCriteria.length + missingCriteria.length;
   if (totalRubricItems > 0) {
     rubricScore = Math.round((matchedCriteria.length / totalRubricItems) * 25);
   }
-  rubricScore = Math.max(5, rubricScore);
 
   // Evidence & Demo: 25 pts max
   let evidenceScore = 25;
@@ -289,7 +293,9 @@ export function reviewPresentation(
   if (gaps.length > 0 && gaps.some((g) => g.severity === 'critical')) evidenceScore -= 5;
   evidenceScore = Math.max(0, evidenceScore);
 
-  const overallScore = structureScore + readabilityScore + rubricScore + evidenceScore;
+  const overallScore = rubricAvailable
+    ? structureScore + readabilityScore + rubricScore + evidenceScore
+    : Math.round((structureScore + readabilityScore + evidenceScore) * (4 / 3));
 
   let grade: PresentationReview['grade'] = 'Needs Work';
   if (overallScore >= 88) grade = 'A';
@@ -298,9 +304,11 @@ export function reviewPresentation(
 
   let summary = '';
   if (criticalMistakes.length === 0) {
-    summary = `Strong presentation deck (${overallScore}/100, Grade ${grade}). Well-structured flow that hits key opportunity priorities.`;
+    summary = rubricAvailable
+      ? 'No critical issues found. The deck is structurally sound and addresses the verified opportunity criteria.'
+      : 'No critical issues found. The deck is structurally sound — no verified judging criteria were found in the research, so this is a structural review only.';
   } else {
-    summary = `Deck evaluated at ${overallScore}/100 (Grade ${grade}). Identified ${criticalMistakes.length} critical mistake${criticalMistakes.length === 1 ? '' : 's'} and ${warnings.length} warning${warnings.length === 1 ? '' : 's'} to address before pitching.`;
+    summary = `Found ${criticalMistakes.length} critical issue${criticalMistakes.length === 1 ? '' : 's'} and ${warnings.length} warning${warnings.length === 1 ? '' : 's'} to address before submitting.${rubricAvailable ? '' : ' Judging criteria could not be verified from the opportunity research — criteria checks are structural only.'}`;
   }
 
   return {
@@ -326,5 +334,6 @@ export function reviewPresentation(
       matchedCriteria,
       missingCriteria,
     },
+    rubricAvailable,
   };
 }

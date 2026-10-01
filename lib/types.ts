@@ -11,6 +11,25 @@ export type OpportunityKind =
 
 export type AlignmentLevel = 'strong' | 'partial' | 'attention';
 
+/** How strongly the source material backs a statement. */
+export type VerificationStatus = 'verified' | 'inferred' | 'unverified';
+
+/** What kind of fact an evidence item establishes. */
+export type EvidenceType =
+  | 'explicit_requirement'
+  | 'explicit_benefit'
+  | 'eligibility'
+  | 'application_material'
+  | 'deadline'
+  | 'selection_criterion'
+  | 'organizer_priority'
+  | 'project_evidence'
+  | 'inference'
+  | 'unknown';
+
+/** Source quality tiers shown in the UI. */
+export type SourceQuality = 'official' | 'project' | 'third_party';
+
 export interface ProjectProfile {
   name: string;
   description: string;
@@ -36,6 +55,7 @@ export interface Source {
   domain: string;
   url: string;
   kind: 'official' | 'community' | 'news' | 'reference' | 'project';
+  quality?: SourceQuality;
   why: string;
   excerpt: string;
   wordCount: number;
@@ -52,6 +72,51 @@ export interface EvidenceItem {
   quote: string;
   claim: string;
   confidence: 'high' | 'medium' | 'low';
+  /** What kind of fact the quote establishes (requirement, deadline, …). */
+  type?: EvidenceType;
+  /** Whether the quote itself states the fact or Contexta inferred it. */
+  status?: VerificationStatus;
+}
+
+/** Evidence read from the user's own repository (code/docs), not the web. */
+export interface ProjectEvidence {
+  id: string;
+  index: number;
+  claim: string;
+  repository: string;
+  file: string;
+  excerpt: string;
+  whyItMatters: string;
+}
+
+export type RequirementCategory =
+  | 'requirement'
+  | 'eligibility'
+  | 'benefit'
+  | 'application_material'
+  | 'selection_criterion'
+  | 'deadline'
+  | 'organizer_priority';
+
+/** A structured fact extracted from real evidence (never invented). */
+export interface RequirementItem {
+  id: string;
+  category: RequirementCategory;
+  /** Concise statement — a faithful compression of the supporting quote. */
+  statement: string;
+  evidenceIds: string[];
+  /** verified = quote on an official source states it; unverified = could not determine. */
+  status: VerificationStatus;
+}
+
+export interface OpportunityIntel {
+  /** 2–3 sentence synthesis written from verified findings only. */
+  summary: string;
+  /** How much Contexta could actually verify, derived from retrieval quality. */
+  researchConfidence: 'high' | 'medium' | 'low';
+  items: RequirementItem[];
+  /** Categories the sources did not answer — shown, never guessed. */
+  unknowns: string[];
 }
 
 export interface AlignmentFinding {
@@ -61,6 +126,13 @@ export interface AlignmentFinding {
   statement: string;
   evidenceIds: string[];
   why: string;
+  /** What the opportunity explicitly expects (from evidence, when available). */
+  expects?: string;
+  /** What the user's project demonstrates (or a clear “not found”). */
+  projectShows?: string;
+  /** How the two sides compare. */
+  relationship?: 'aligned' | 'partially_aligned' | 'gap' | 'unknown';
+  projectEvidenceIds?: string[];
 }
 
 export interface GapFinding {
@@ -70,11 +142,22 @@ export interface GapFinding {
   statement: string;
   evidenceIds: string[];
   why: string;
+  /** Precise missing item. */
+  whatIsMissing?: string;
+  /** Connection to the opportunity — or an explicit “strategic” framing. */
+  whyItMatters?: string;
+  /** True when the opportunity's own sources require this. */
+  requiredByOpportunity?: boolean;
+  /** Specific, concrete recommended action. */
+  recommendedAction?: string;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 export interface Recommendation {
   id: string;
   index: number;
+  /** Plan phase, e.g. “Verify eligibility” — used as the row label. */
+  phase?: string;
   title: string;
   rationale: string;
   evidenceIds: string[];
@@ -134,6 +217,10 @@ export interface WorkflowState {
   opportunity: Opportunity;
   sources: Source[];
   evidence: EvidenceItem[];
+  /** Structured opportunity requirements, extracted from evidence. */
+  intel?: OpportunityIntel;
+  /** Evidence read from the user's own repository. */
+  projectEvidence?: ProjectEvidence[];
   alignment: AlignmentFinding[];
   gaps: GapFinding[];
   recommendations: Recommendation[];
@@ -186,6 +273,8 @@ export interface PresentationReview {
     matchedCriteria: string[];
     missingCriteria: string[];
   };
+  /** True when verified opportunity criteria (a real rubric) were available to check against. */
+  rubricAvailable?: boolean;
 }
 
 export interface PresentationData {
@@ -198,5 +287,17 @@ export interface PresentationData {
 
 export type WorkflowSnapshot = Pick<
   WorkflowState,
-  'id' | 'updatedAt' | 'state' | 'sources' | 'evidence' | 'alignment' | 'gaps' | 'recommendations' | 'action' | 'approval' | 'execution'
+  | 'id'
+  | 'updatedAt'
+  | 'state'
+  | 'sources'
+  | 'evidence'
+  | 'intel'
+  | 'projectEvidence'
+  | 'alignment'
+  | 'gaps'
+  | 'recommendations'
+  | 'action'
+  | 'approval'
+  | 'execution'
 > & { summary: string | null; presentation?: PresentationData };

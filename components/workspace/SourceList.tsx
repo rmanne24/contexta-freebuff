@@ -3,6 +3,7 @@
 import { ExternalLink } from 'lucide-react';
 import type { Source } from '@/lib/types';
 import { Eyebrow, ExternalLinkIcon, Sheet } from '@/components/ui';
+import { QualityTag, qualityLabel } from './EvidenceBits';
 
 const KIND_LABEL: Record<Source['kind'], string> = {
   official: 'Official',
@@ -16,15 +17,18 @@ export function SourceList({ sources, onSelect }: { sources: Source[]; onSelect:
   if (sources.length === 0) return null;
   const ok = sources.filter((s) => s.retrieved);
   const failed = sources.filter((s) => !s.retrieved);
+  const official = ok.filter((s) => qualityLabel(s).label === 'Official').length;
+  const project = ok.filter((s) => qualityLabel(s).label === 'Project').length;
+  const other = ok.length - official - project;
 
   return (
     <section aria-labelledby="sources-heading">
-      <div className="flex items-baseline justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="sources-heading" className="eyebrow">
-          What we found
+          Evidence trail — sources
         </h2>
         <span className="text-[12px] text-[#A6A099] tabular-nums">
-          {ok.length} source{ok.length === 1 ? '' : 's'} · live
+          {official} official · {project} project · {other} other
         </span>
       </div>
 
@@ -60,11 +64,11 @@ function SourceRow({ source, onSelect }: { source: Source; onSelect: (s: Source)
         </span>
         <span className="flex items-center gap-3 text-[11.5px] text-[#A6A099] whitespace-nowrap">
           {source.retrieved ? (
-            <span>{source.wordCount.toLocaleString()} words</span>
+            <span className="hidden md:inline">{source.wordCount.toLocaleString()} words</span>
           ) : (
             <span className="text-[#A5554C]">unreachable</span>
           )}
-          <span className="hidden sm:inline">{KIND_LABEL[source.kind]}</span>
+          <QualityTag source={source} />
         </span>
       </button>
     </article>
@@ -76,6 +80,7 @@ export function SourceSheetBody({ source }: { source: Source }) {
     <div>
       <div className="flex items-center gap-2">
         <Eyebrow accent>{KIND_LABEL[source.kind]}</Eyebrow>
+        <QualityTag source={source} />
         <a
           href={source.url}
           target="_blank"

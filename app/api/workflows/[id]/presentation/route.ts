@@ -62,7 +62,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
       w.opportunity,
       w.project,
       w.evidence,
-      w.gaps
+      w.gaps,
+      w.intel
     );
 
     w.presentation = {

@@ -1,10 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Wordmark, Eyebrow, Spinner } from '@/components/ui';
 import { AccountMenu } from '@/components/AuthHeaderBits';
+import { trimToWordBoundary } from '@/lib/utils';
 
 interface StartState {
   step: 1 | 2 | 3;
@@ -35,9 +36,10 @@ export default function StartPage() {
   const [prefilled, setPrefilled] = useState(false);
 
   // Personalization: prefill the project from the user's most recent workflow.
+  const prefilledRef = useRef(false);
   useEffect(() => {
-    if (prefilled) return;
-    setPrefilled(true);
+    if (prefilledRef.current) return;
+    prefilledRef.current = true;
     fetch('/api/me', { cache: 'no-store' })
       .then((r) => r.json())
       .then((d: { user?: { lastProjectId?: string } | null }) => {
@@ -56,7 +58,7 @@ export default function StartPage() {
           });
       })
       .catch(() => undefined);
-  }, [prefilled]);
+  }, []);
 
   const set = <K extends keyof StartState>(k: K, v: StartState[K]) => setS((p) => ({ ...p, [k]: v }));
 
@@ -92,7 +94,15 @@ export default function StartPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           project: {
-            name: s.projectName || s.projectDescription.slice(0, 48),
+            // Derive a short name from the description's lead phrase when none given,
+            // e.g. "Contexta is an AI research copilot…" → "Contexta".
+            name:
+              s.projectName ||
+              (/^[A-Z][\w .'-]{1,39}\bis\b/.test(s.projectDescription)
+                ? s.projectDescription.match(/^([A-Z][\w .'-]{1,39}?)\bis\b/)![1].trim()
+                : '') ||
+              trimToWordBoundary(s.projectDescription, 48) ||
+              'Untitled project',
             description: s.projectDescription,
             repoUrl: s.repoUrl || undefined,
           },
@@ -100,7 +110,7 @@ export default function StartPage() {
             url: s.opportunityUrl || undefined,
             description: s.opportunityDescription,
             goal: s.goal || undefined,
-            title: s.opportunityDescription.slice(0, 60) || s.opportunityUrl,
+            title: trimToWordBoundary(s.opportunityDescription, 60) || s.opportunityUrl,
           },
         }),
       });

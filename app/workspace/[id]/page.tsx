@@ -3,14 +3,16 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpRight } from 'lucide-react';
-import type { WorkflowState, Source } from '@/lib/types';
+import { ArrowUpRight } from 'lucide-react';
+import type { WorkflowState, Source, RequirementCategory, RequirementItem } from '@/lib/types';
 import { Wordmark, Eyebrow, Spinner, Sheet, StatusDot } from '@/components/ui';
 import { ResearchProgress } from '@/components/workspace/ResearchProgress';
 import { SourceList, SourceSheetBody } from '@/components/workspace/SourceList';
 import { AlignmentSection, GapSection, RecommendationSection } from '@/components/workspace/Analysis';
 import { ApprovalPanel, ExecutionTimeline, VerificationReceipt } from '@/components/workspace/ActionFlow';
 import { DeckReviewSection } from '@/components/workspace/DeckReviewSection';
+import { IntelSection } from '@/components/workspace/IntelSection';
+import { StatusBadge } from '@/components/workspace/EvidenceBits';
 
 const STATE_LABEL: Record<string, string> = {
   IDLE: 'Idle',
@@ -25,6 +27,25 @@ const STATE_LABEL: Record<string, string> = {
   VERIFIED: 'Action verified',
   FAILED: 'Interrupted',
   REJECTED: 'Rejected',
+};
+
+const CONFIDENCE_META: Record<
+  NonNullable<WorkflowState['intel']>['researchConfidence'],
+  { label: string; cls: string; bg: string }
+> = {
+  high: { label: 'High', cls: 'text-[#5E7D5A]', bg: '#EFF3EC' },
+  medium: { label: 'Medium', cls: 'text-[#B08A3E]', bg: '#F7F1E4' },
+  low: { label: 'Low', cls: 'text-[#A5554C]', bg: '#F6ECEA' },
+};
+
+const FINDING_LABEL: Record<RequirementCategory, string> = {
+  requirement: 'Requirement',
+  eligibility: 'Eligibility',
+  application_material: 'Application material',
+  selection_criterion: 'Selection criterion',
+  deadline: 'Deadline',
+  benefit: 'Benefit',
+  organizer_priority: 'Organizer priority',
 };
 
 export default function WorkspacePage() {
@@ -56,7 +77,8 @@ export default function WorkspacePage() {
 
   useEffect(() => {
     if (!id) return;
-    refresh();
+    // Schedule as a microtask so state updates happen outside the effect body.
+    Promise.resolve().then(refresh);
     fetch('/api/capabilities')
       .then((r) => r.json())
       .then((d: { github: boolean }) => setGithubReady(d.github))
@@ -79,7 +101,7 @@ export default function WorkspacePage() {
         pollRef.current = null;
       }
     };
-  }, [w?.state, refresh]);
+  }, [w, refresh]);
 
   async function act(op: 'propose' | 'approve' | 'reject', recommendationId?: string) {
     setActingBusy(true);
@@ -128,6 +150,27 @@ export default function WorkspacePage() {
   const failedResearch = w.state === 'FAILED' && w.sources.length === 0;
   const showActionStates = w.state === 'AWAITING_APPROVAL' || w.state === 'EXECUTING' || w.state === 'VERIFYING' || w.state === 'FAILED' || w.state === 'VERIFIED';
 
+  /* ---------- Derived header + finding data ---------- */
+  const retrieved = w.sources.filter((s) => s.retrieved);
+  const officialCount = retrieved.filter((s) => s.quality === 'official').length;
+  const projectCount = retrieved.filter((s) => s.quality === 'project').length;
+  const otherCount = retrieved.length - officialCount - projectCount;
+  const confidence = w.intel?.researchConfidence;
+
+  const keyFindings: RequirementItem[] = (w.intel?.items || [])
+    .slice()
+    .sort((a, b) => (a.status === 'verified' ? 0 : 1) - (b.status === 'verified' ? 0 : 1))
+    .slice(0, 5);
+
+  const sourceOfItem = (item: RequirementItem): Source | undefined => {
+    const ev = w.evidence.find((e) => item.evidenceIds.includes(e.id));
+    return w.sources.find((s) => s.id === ev?.sourceId);
+  };
+
+  const heroLine = w.intel?.summary?.trim()
+    ? w.intel.summary
+    : `Contexta read ${retrieved.length} live source${retrieved.length === 1 ? '' : 's'} behind this opportunity and weighed them against ${w.project.name}.`;
+
   return (
     <main className="min-h-screen">
       <div className="mx-auto max-w-[1200px] px-6 sm:px-10 pb-32">
@@ -164,27 +207,89 @@ export default function WorkspacePage() {
           <div className="grid gap-16 lg:grid-cols-[1.5fr_1fr] lg:gap-20 pt-10">
             {/* ----- Left: intelligence stream ----- */}
             <div className="min-w-0">
-              <Eyebrow accent>{w.opportunity.organization || w.opportunity.title}</Eyebrow>
-              <h1 className="font-serif-display mt-5 text-[40px] sm:text-[56px] leading-[1.04]">
-                Here’s what matters.
+              {/* Hero */}
+              <Eyebrow accent>Research complete</Eyebrow>
+              <h1 className="font-serif-display mt-5 text-[36px] sm:text-[52px] leading-[1.06] max-w-[720px]">
+                {w.opportunity.title}
               </h1>
-              <p className="mt-7 text-[16px] leading-[1.8] text-[#33302c] max-w-[620px]">
-                {w.opportunity.description && (
-                  <span className="text-[#77736C]">{w.opportunity.description.slice(0, 180)}{w.opportunity.description.length > 180 ? '… ' : ' '}</span>
+
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[12.5px] text-[#77736C]">
+                {confidence && (
+                  <span className="flex items-center gap-2">
+                    <span className="uppercase tracking-[0.12em] text-[10.5px] text-[#A6A099]">Research confidence</span>
+                    <span
+                      className={`text-[10.5px] uppercase tracking-[0.14em] font-medium px-2 py-[3px] rounded-full ${CONFIDENCE_META[confidence].cls}`}
+                      style={{ background: CONFIDENCE_META[confidence].bg }}
+                    >
+                      {CONFIDENCE_META[confidence].label}
+                    </span>
+                  </span>
                 )}
-                {w.evidence.length > 0 || w.alignment.length > 0 ? null : null}
-                {w.opportunity.goal && <span className="text-[#77736C]">Your goal: {w.opportunity.goal}. </span>}
-                Contexta read {w.sources.filter((s) => s.retrieved).length} live source{w.sources.filter((s) => s.retrieved).length === 1 ? '' : 's'} behind this opportunity and weighed them against your project.
-              </p>
+                <span className="flex items-center gap-1.5 tabular-nums">
+                  <span className="uppercase tracking-[0.12em] text-[10.5px] text-[#A6A099]">Sources</span>
+                  <span className="text-[#5E7D5A] font-medium">{officialCount} official</span>
+                  <span className="text-[#A6A099]">·</span>
+                  <span className="text-[#6F5B91] font-medium">{projectCount} project</span>
+                  <span className="text-[#A6A099]">·</span>
+                  <span>{otherCount} other</span>
+                </span>
+              </div>
+
+              <p className="mt-6 text-[15.5px] leading-[1.75] text-[#33302c] max-w-[640px]">{heroLine}</p>
 
               <div className="mt-12 space-y-14">
+                {/* What matters — top findings, each traced to a source */}
+                {keyFindings.length > 0 && (
+                  <section aria-labelledby="key-findings-heading">
+                    <h2 id="key-findings-heading" className="eyebrow">What matters</h2>
+                    <ul className="mt-5 space-y-0 border-t border-[rgba(25,24,23,0.1)]">
+                      {keyFindings.map((item, i) => {
+                        const src = sourceOfItem(item);
+                        return (
+                          <li key={item.id} className="py-5 border-b border-[rgba(25,24,23,0.1)] flex gap-4">
+                            <span className="text-[12px] tabular-nums text-[#A6A099] pt-[3px] shrink-0">
+                              {String(i + 1).padStart(2, '0')}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="text-[10.5px] uppercase tracking-[0.16em] text-[#A6A099] font-medium">
+                                {FINDING_LABEL[item.category]}
+                              </p>
+                              <p className="mt-1 text-[15px] leading-snug text-[#191817]">{item.statement}</p>
+                              <div className="mt-1.5 flex flex-wrap items-center gap-2.5 text-[12px] text-[#77736C]">
+                                <StatusBadge status={item.status} className="!py-[1px]" />
+                                {src && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedSource(src)}
+                                    className="hover:text-[#191817] underline decoration-[rgba(25,24,23,0.2)] underline-offset-2 text-left"
+                                  >
+                                    Source [{String(src.index).padStart(2, '0')}] {src.domain}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                )}
+
+                {/* Full structured intelligence */}
+                <IntelSection intel={w.intel} evidence={w.evidence} sources={w.sources} hideConfidence />
+
                 <SourceList sources={w.sources} onSelect={setSelectedSource} />
 
-                {w.alignment.length > 0 && <AlignmentSection alignment={w.alignment} evidence={w.evidence} sources={w.sources} />}
+                {w.alignment.length > 0 && (
+                  <AlignmentSection
+                    alignment={w.alignment}
+                    evidence={w.evidence}
+                    sources={w.sources}
+                    projectEvidence={w.projectEvidence}
+                  />
+                )}
 
                 {w.gaps.length > 0 && <GapSection gaps={w.gaps} evidence={w.evidence} sources={w.sources} />}
-
-                <DeckReviewSection workflow={w} onUpdate={setW} />
 
                 {w.recommendations.length > 0 && (
                   <RecommendationSection
@@ -199,21 +304,28 @@ export default function WorkspacePage() {
                     githubReady={githubReady}
                   />
                 )}
+
+                <DeckReviewSection workflow={w} onUpdate={setW} />
               </div>
             </div>
 
             {/* ----- Right: context / action panel ----- */}
             <aside className="min-w-0">
               <div className="lg:sticky lg:top-10 space-y-8">
-                {/* Project context */}
+                {/* Project snapshot — concise, not a repeated description */}
                 <section aria-labelledby="ctx-heading" className="paper px-6 py-6">
-                  <h2 id="ctx-heading" className="eyebrow">Your project</h2>
+                  <h2 id="ctx-heading" className="eyebrow">Project context</h2>
                   <p className="mt-3 text-[14px] font-medium leading-snug">{w.project.name}</p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-[#77736C] line-clamp-6">{w.project.description}</p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-[#77736C] line-clamp-3">{w.project.description}</p>
                   {w.project.repoUrl && (
                     <a href={w.project.repoUrl} target="_blank" rel="noreferrer" className="btn-text mt-4 text-[12.5px]">
                       {w.project.repoUrl.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')} <ArrowUpRight size={13} strokeWidth={1.8} />
                     </a>
+                  )}
+                  {(w.projectEvidence?.length || 0) > 0 && (
+                    <p className="mt-3 text-[11.5px] text-[#A6A099]">
+                      {w.projectEvidence!.length} evidence item{w.projectEvidence!.length === 1 ? '' : 's'} read from the repository below.
+                    </p>
                   )}
                 </section>
 

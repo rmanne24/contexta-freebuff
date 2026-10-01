@@ -128,15 +128,31 @@ export function extractLinks(rawHtml: string, baseUrl: string): Array<{ url: str
 export function scoreUrl(url: string): number {
   let s = 0;
   const u = url.toLowerCase();
-  if (/hackathon|challenge|buildfast/.test(u)) s += 4;
-  if (/criteri|judg|rubric/.test(u)) s += 4;
-  if (/rule|faq|prize|track|deadline|submission|guideline|brief/.test(u)) s += 3;
-  if (/about|program|announcement|docs?\//.test(u)) s += 1;
+  // Priority order: exact application page → eligibility → FAQ/instructions →
+  // judging criteria → program docs → organizer pages.
+  if (/\bapply\b|application|apply-now|enter\b/.test(u)) s += 5;
+  if (/eligib|who-can|qualification|participant/.test(u)) s += 5;
+  if (/\bfaq\b|questions|guideline|instruction|how-to-apply/.test(u)) s += 4;
+  if (/criteri|judg|rubric|evaluat|selection/.test(u)) s += 4;
+  if (/rule|prize|track|deadline|timeline|submission|submit|deliverable|brief/.test(u)) s += 3;
+  if (/requirement|format|spec|details/.test(u)) s += 2;
+  if (/about|program|announcement|overview|docs?\//.test(u)) s += 1;
   if (/\.(jpg|jpeg|png|gif|webp|svg|mp4|zip|pdf|ico|css|js)(\?|$)/i.test(u)) s -= 8;
   if (/twitter\.com|x\.com|instagram\.com|facebook\.com|tiktok\.com|youtube\.com/.test(u)) s -= 3;
-  if (/login|signin|signup|register|cart|checkout|wp-content|wp-json/.test(u)) s -= 5;
+  if (/login|signin|signup|cart|checkout|wp-content|wp-json|privacy|terms|cookie/.test(u)) s -= 5;
   if (u.length > 180) s -= 2;
   return s;
+}
+
+/**
+ * Source quality tier: project (the user's own repo) → official (the
+ * opportunity's own site) → third-party. Failed retrievals are shown as
+ * unverified in the UI and never used as evidence.
+ */
+export function sourceQuality(url: string, host: string, seedHosts: string[]): 'official' | 'project' | 'third_party' {
+  if (/github\.com$/i.test(host)) return 'project';
+  if (seedHosts.some((h) => host === h || host.endsWith(`.${h}`))) return 'official';
+  return 'third_party';
 }
 
 function normalize(u: string): string {
@@ -152,6 +168,7 @@ function normalize(u: string): string {
 /**
  * Discover related pages on the opportunity's site, one level deep,
  * without any hardcoded URLs: crawl the seed page itself and score hrefs.
+ * Same-site only — application/eligibility/criteria pages rank highest.
  */
 export async function discoverLinks(
   seeds: string[],
