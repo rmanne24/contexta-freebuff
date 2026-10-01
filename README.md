@@ -16,8 +16,7 @@ intelligence loop on it:
 # Project Presentation
 
 ## 🎥 Demo Video
-[Watch the project demo on YouTube](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
-
+[Watch the project demo on YouTube](https://youtu.be/sdVkVMy4YgU)
 ## 📊 Project Presentation
 [View the PowerPoint presentation on Google Drive](https://drive.google.com/file/d/1nUvi-OuNXgOo02O-Rat9IrZYHQLYixco/view?usp=sharing)
 
