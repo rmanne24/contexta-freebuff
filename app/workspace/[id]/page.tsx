@@ -13,6 +13,7 @@ import { ApprovalPanel, ExecutionTimeline, VerificationReceipt } from '@/compone
 import { DeckReviewSection } from '@/components/workspace/DeckReviewSection';
 import { IntelSection } from '@/components/workspace/IntelSection';
 import { StatusBadge } from '@/components/workspace/EvidenceBits';
+import RequireAuth from '@/components/RequireAuth';
 
 const STATE_LABEL: Record<string, string> = {
   IDLE: 'Idle',
@@ -61,7 +62,7 @@ const FINDING_WEIGHT: Record<RequirementCategory, number> = {
   organizer_content: 0,
 };
 
-export default function WorkspacePage() {
+function WorkspaceInner() {
   const params = useParams<{ id: string }>();
   const id = params?.id;
   const [w, setW] = useState<WorkflowState | null>(null);
@@ -142,7 +143,7 @@ export default function WorkspacePage() {
           <Eyebrow accent>Research interrupted</Eyebrow>
           <h1 className="font-serif-display mt-5 text-[32px] leading-tight">We couldn’t open this workspace.</h1>
           <p className="mt-4 text-[14px] text-[#77736C] leading-relaxed">{loadError}</p>
-          <Link href="/start" className="btn btn-primary mt-8">Start a new opportunity</Link>
+          <Link href="/home" className="btn btn-primary mt-8">Back to your workspace</Link>
         </div>
       </main>
     );
@@ -197,7 +198,7 @@ export default function WorkspacePage() {
         {/* ---------- Header ---------- */}
         <header className="flex items-center justify-between py-6">
           <div className="flex items-center gap-5">
-            <Link href="/" aria-label="Contexta home"><Wordmark className="!text-[16px]" /></Link>
+            <Link href="/home" aria-label="Your workspace"><Wordmark className="!text-[16px]" /></Link>
             <span className="hidden sm:block h-4 w-px bg-[rgba(25,24,23,0.15)]" aria-hidden="true" />
             <span className="hidden sm:block text-[13px] text-[#77736C] max-w-[300px] truncate">{w.project.name}</span>
           </div>
@@ -406,5 +407,13 @@ export default function WorkspacePage() {
         {selectedSource && <SourceSheetBody source={selectedSource} />}
       </Sheet>
     </main>
+  );
+}
+
+export default function WorkspacePage() {
+  return (
+    <RequireAuth>
+      <WorkspaceInner />
+    </RequireAuth>
   );
 }

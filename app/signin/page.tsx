@@ -93,7 +93,7 @@ function SignInInner() {
 
           {me?.user && (
             <p className="mt-8 text-[13px] text-[#5E7D5A]">
-              You’re already signed in as {me.user.email} — <Link href="/start" className="btn-text">go to your workspace</Link>.
+              You’re already signed in as {me.user.email} — <Link href="/home" className="btn-text">go to your workspace</Link>.
             </p>
           )}
         </div>

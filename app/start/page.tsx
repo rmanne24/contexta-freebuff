@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Wordmark, Eyebrow, Spinner } from '@/components/ui';
 import { AccountMenu } from '@/components/AuthHeaderBits';
+import RequireAuth from '@/components/RequireAuth';
 import { trimToWordBoundary } from '@/lib/utils';
 
 interface StartState {
@@ -20,7 +21,7 @@ interface StartState {
 const EXAMPLE_PROJECT =
   'I’m building an AI research assistant that helps students find and apply to opportunities.';
 
-export default function StartPage() {
+function StartInner() {
   const router = useRouter();
   const [s, setS] = useState<StartState>({
     step: 1,
@@ -297,5 +298,13 @@ export default function StartPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function StartPage() {
+  return (
+    <RequireAuth>
+      <StartInner />
+    </RequireAuth>
   );
 }

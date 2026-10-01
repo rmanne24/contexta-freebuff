@@ -20,7 +20,10 @@ export interface UserRecord {
   email: string;
   name: string;
   picture?: string;
+  /** Google account subject id (`sub`), stored on first sign-in for provider linkage. */
+  googleSub?: string;
   createdAt: string;
+  updatedAt?: string;
   lastProjectId?: string;
   keys: Record<string, { ciphertext: string; iv: string; tag: string; preview: string; updatedAt: string }>;
 }
@@ -105,6 +108,9 @@ export async function upsertUserFromGoogle(p: {
   rec.email = p.email;
   if (p.name) rec.name = p.name;
   if (p.picture) rec.picture = p.picture;
+  if (p.sub) rec.googleSub = p.sub;
+  // Preserve the original createdAt; refresh updatedAt on every sign-in.
+  rec.updatedAt = new Date().toISOString();
   await saveUser(rec);
   return rec;
 }

@@ -1,18 +1,13 @@
 import { NextResponse, after } from 'next/server';
-import { proposeAction, approveAction, rejectAction, executeAction } from '@/lib/pipeline';
-import { sessionFromRequest } from '@/lib/auth';
-import { getWorkflow } from '@/lib/pipeline';
+import { proposeAction, approveAction, rejectAction, executeAction, getWorkflow } from '@/lib/pipeline';
+import { requireOwnedWorkflow } from '@/lib/guard';
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
 
-  // Ownership check: signed-in users act only on their own workflows.
-  const w = await getWorkflow(id);
-  if (!w) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
-  const session = sessionFromRequest(req);
-  if (w.userId && (!session || session.id !== w.userId)) {
-    return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
-  }
+  // Ownership check: only the owner can propose, approve, or reject actions.
+  const owned = await requireOwnedWorkflow(req, id);
+  if (!owned.w) return owned.res;
 
   try {
     const body = (await req.json()) as { op?: string; recommendationId?: string };

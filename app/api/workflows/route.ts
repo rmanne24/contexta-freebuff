@@ -1,10 +1,13 @@
 import { NextResponse, after } from 'next/server';
 import { startWorkflow, runResearch } from '@/lib/pipeline';
 import { listWorkflows } from '@/lib/store';
-import { sessionFromRequest } from '@/lib/auth';
+import { requireSession } from '@/lib/guard';
 import { setLastProject } from '@/lib/userStore';
 
 export async function POST(req: Request) {
+  // Every workflow is owned: derive the user from the signed session, never from the client.
+  const { session, res } = requireSession(req);
+  if (!session) return res;
   try {
     const body = (await req.json()) as {
       project?: { name?: string; description?: string; repoUrl?: string; audience?: string; stage?: string; problem?: string };
@@ -16,7 +19,6 @@ export async function POST(req: Request) {
     if (!body.opportunity?.url && !body.opportunity?.description) {
       return NextResponse.json({ error: 'Provide an opportunity URL or description.' }, { status: 400 });
     }
-    const session = sessionFromRequest(req);
     const w = await startWorkflow(
       {
         project: {
@@ -36,9 +38,9 @@ export async function POST(req: Request) {
           goal: body.opportunity.goal,
         },
       },
-      session?.id
+      session.id
     );
-    if (session) void setLastProject(session.id, w.id);
+    void setLastProject(session.id, w.id);
     // Keep execution context alive in Vercel serverless functions
     after(async () => {
       await runResearch(w.id).catch(() => undefined);
@@ -53,7 +55,9 @@ export async function POST(req: Request) {
 }
 
 export async function GET(req: Request) {
-  const session = sessionFromRequest(req);
-  const workflows = session ? await listWorkflows(session.id) : [];
+  // Only ever the caller's own workflows.
+  const { session, res } = requireSession(req);
+  if (!session) return res;
+  const workflows = await listWorkflows(session.id);
   return NextResponse.json({ workflows });
 }

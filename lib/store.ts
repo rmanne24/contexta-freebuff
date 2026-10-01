@@ -4,10 +4,12 @@ import type { WorkflowState, WorkflowSnapshot } from './types';
 
 /**
  * JSON-file-backed store. One file per workflow under .data/workflows.
- * Workflows may be owned by a user (userId) or anonymous (userId undefined)
- * so a visitor can run one research before signing in; on sign-in those
- * are adopted. Swap this module for Supabase/FastAPI persistence later
- * without touching the pipeline or the UI (same function signatures).
+ * Every workflow is owned: it carries the userId of the signed-in account
+ * that created it, and reads/writes are scoped to that user. Pre-existing
+ * anonymous (userId-less) rows from development are inert — no code path
+ * lists or adopts them anymore. Swap this module for Supabase/FastAPI
+ * persistence later without touching the pipeline or the UI (same
+ * function signatures).
  */
 
 import { getRedis } from './redis';
@@ -91,6 +93,8 @@ function snapshot(w: WorkflowState): WorkflowSnapshot {
     id: w.id,
     updatedAt: w.updatedAt,
     state: w.state,
+    project: { name: w.project.name },
+    opportunity: { title: w.opportunity.title },
     summary: null,
     sources: w.sources,
     evidence: w.evidence,
@@ -128,69 +132,6 @@ export async function listWorkflows(userId: string): Promise<WorkflowSnapshot[]>
     .filter((w) => w.userId === userId)
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .map(snapshot);
-}
-
-/** Anonymous (pre-sign-in) workflows, newest first. */
-export async function listAnonymousWorkflows(): Promise<WorkflowSnapshot[]> {
-  const redis = getRedis();
-  if (redis) {
-    try {
-      const ids = await redis.smembers('wf:anon');
-      if (!ids || ids.length === 0) return [];
-      const list: WorkflowState[] = [];
-      for (const id of ids) {
-        const item = await redis.get<WorkflowState>(`wf:${id}`);
-        if (item) list.push(item);
-      }
-      return list
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .map(snapshot);
-    } catch (e) {
-      console.error('Redis listAnonymousWorkflows error:', e);
-    }
-  }
-
-  const all = await readAll();
-  return all
-    .filter((w) => !w.userId)
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .map(snapshot);
-}
-
-/** On first sign-in, claim the anonymous workflows created in this browser session window. */
-export async function adoptAnonymousWorkflows(userId: string): Promise<number> {
-  const redis = getRedis();
-  if (redis) {
-    try {
-      const anonIds = await redis.smembers('wf:anon');
-      let adopted = 0;
-      for (const id of anonIds) {
-        const item = await redis.get<WorkflowState>(`wf:${id}`);
-        if (item) {
-          item.userId = userId;
-          await redis.set(`wf:${id}`, item);
-          await redis.sadd(`wf:user:${userId}`, id);
-          await redis.srem('wf:anon', id);
-          adopted++;
-        }
-      }
-      return adopted;
-    } catch (e) {
-      console.error('Redis adoptAnonymousWorkflows error:', e);
-    }
-  }
-
-  const all = await readAll();
-  const cutoff = Date.now() - 1000 * 60 * 60 * 24; // last 24h
-  let adopted = 0;
-  for (const w of all) {
-    if (w.userId) continue;
-    if (new Date(w.createdAt).getTime() < cutoff) continue;
-    w.userId = userId;
-    await saveWorkflow(w);
-    adopted++;
-  }
-  return adopted;
 }
 
 export function newId(): string {

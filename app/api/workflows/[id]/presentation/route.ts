@@ -1,22 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getWorkflow } from '@/lib/pipeline';
 import { saveWorkflow } from '@/lib/store';
-import { sessionFromRequest } from '@/lib/auth';
+import { requireOwnedWorkflow } from '@/lib/guard';
 import { parsePptxBuffer, parseTextPresentation } from '@/lib/pptxParser';
 import { reviewPresentation } from '@/lib/deckReviewer';
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const w = await getWorkflow(id);
-  if (!w) {
-    return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
-  }
-
-  // Session check if user owns this workflow
-  const session = sessionFromRequest(req);
-  if (w.userId && (!session || session.id !== w.userId)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
+  // Ownership check: only the owner can upload or replace a deck review.
+  const owned = await requireOwnedWorkflow(req, id);
+  if (!owned.w) return owned.res;
+  const w = owned.w;
 
   try {
     const contentType = req.headers.get('content-type') || '';
@@ -92,15 +85,10 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const w = await getWorkflow(id);
-  if (!w) {
-    return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
-  }
-
-  const session = sessionFromRequest(req);
-  if (w.userId && (!session || session.id !== w.userId)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-  }
+  // Ownership check: only the owner can remove a deck review.
+  const owned = await requireOwnedWorkflow(req, id);
+  if (!owned.w) return owned.res;
+  const w = owned.w;
 
   delete w.presentation;
   w.updatedAt = new Date().toISOString();

@@ -304,4 +304,10 @@ export type WorkflowSnapshot = Pick<
   | 'action'
   | 'approval'
   | 'execution'
-> & { summary: string | null; presentation?: PresentationData };
+> & {
+  summary: string | null;
+  presentation?: PresentationData;
+  /** Row labels for the user's workspace history. */
+  project: { name: string };
+  opportunity: { title: string };
+};

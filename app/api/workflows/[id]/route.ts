@@ -1,16 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getWorkflow } from '@/lib/pipeline';
-import { sessionFromRequest } from '@/lib/auth';
+import { requireOwnedWorkflow } from '@/lib/guard';
 
-export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const w = await getWorkflow(id);
-  if (!w) return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
-
-  const session = sessionFromRequest(_req);
-  if (w.userId && (!session || session.id !== w.userId)) {
-    // Signed-in data is private to its owner.
-    return NextResponse.json({ error: 'Workflow not found' }, { status: 404 });
-  }
+  // Ownership is verified against the signed session before anything is returned.
+  const { w, res } = await requireOwnedWorkflow(req, id);
+  if (!w) return res;
   return NextResponse.json(w);
 }

@@ -10,7 +10,6 @@ import {
   createSessionToken,
 } from '@/lib/auth';
 import { upsertUserFromGoogle } from '@/lib/userStore';
-import { adoptAnonymousWorkflows } from '@/lib/store';
 
 export async function GET(req: Request) {
   const base = appUrlFromRequest(req);
@@ -36,10 +35,11 @@ export async function GET(req: Request) {
     const profile = await fetchGoogleProfile(tokens.access_token);
     if (!profile.email) return fail('no_email');
 
+    // Creates the account on first sign-in. No anonymous workflows are
+    // adopted here: each user only ever sees what they created themselves.
     const user = await upsertUserFromGoogle(profile);
-    await adoptAnonymousWorkflows(user.id);
 
-    const res = NextResponse.redirect(`${base}/start`);
+    const res = NextResponse.redirect(`${base}/home?welcome=1`);
     const opts = sessionCookieOptions();
     res.cookies.set(SESSION_COOKIE, createSessionToken({
       id: user.id,

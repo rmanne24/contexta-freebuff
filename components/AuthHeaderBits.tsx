@@ -48,11 +48,8 @@ export function AccountMenu() {
   if (!me?.user) {
     return (
       <div className="flex items-center gap-4">
-        <Link href="/signin" className="hidden sm:inline text-[13px] text-[#77736C] hover:text-[#191817] transition-colors">
-          Sign in
-        </Link>
-        <Link href="/start" className="btn btn-ghost !py-2 !px-4 text-[13px]">
-          Start exploring
+        <Link href="/signin" className="inline-flex items-center gap-1.5 text-[13px] text-[#77736C] hover:text-[#191817] transition-colors">
+          Continue with Google
         </Link>
       </div>
     );
