@@ -1,4 +1,3 @@
-````markdown
 # Contexta
 
 ## Your AI Opportunity Operating System
@@ -75,15 +74,15 @@ After an approved action is executed, Contexta verifies the result against the r
 
 Repository:
 
-https://github.com/rmanne24/contexta-production
+[https://github.com/rmanne24/contexta-production](https://github.com/rmanne24/contexta-production)
 
 Demo Video:
 
-https://youtu.be/sdVkVMy4YgU
+[https://youtu.be/sdVkVMy4YgU](https://youtu.be/sdVkVMy4YgU)
 
 Project Presentation:
 
-https://drive.google.com/file/d/1nUvi-OuNXgOo02O-Rat9IrZYHQLYixco/view?usp=sharing
+[https://drive.google.com/file/d/1nUvi-OuNXgOo02O-Rat9IrZYHQLYixco/view?usp=sharing](https://drive.google.com/file/d/1nUvi-OuNXgOo02O-Rat9IrZYHQLYixco/view?usp=sharing)
 
 ## Technology Stack
 
@@ -104,7 +103,7 @@ https://drive.google.com/file/d/1nUvi-OuNXgOo02O-Rat9IrZYHQLYixco/view?usp=shari
 ```bash
 git clone https://github.com/rmanne24/contexta-production.git
 cd contexta-production
-````
+```
 
 ### 2. Install dependencies
 
@@ -306,6 +305,3 @@ The goal is to help users go from:
 ## License
 
 This project is currently intended as a hackathon project.
-
-```
-```
